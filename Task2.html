@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interactive Navigation — Single File</title>
+  <style>
+    :root{
+      --nav-height: 70px;
+      --accent: #00eaff;
+      --bg: rgba(34,34,34,0.95);
+      --glass: rgba(255,255,255,0.06);
+      --text: #ffffff;
+      --muted: #cfcfcf;
+    }
+
+    html{ scroll-behavior: smooth; }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      color:#111;
+      line-height:1.5;
+      background:linear-gradient(180deg,#fafafa,#eee);
+    }
+
+    /* ---------- NAV ---------- */
+    nav{
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      height:var(--nav-height);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 1rem;
+      gap:1rem;
+      z-index:1000;
+      transition: background 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+      background:transparent;
+      backdrop-filter: blur(6px);
+    }
+
+    nav.scrolled{
+      background: var(--bg);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+      transform: translateY(0);
+    }
+
+    .logo{
+      color:var(--text);
+      font-weight:700;
+      font-size:1.125rem;
+      letter-spacing:0.2px;
+    }
+
+    /* ---------- NAV LINKS ---------- */
+    .nav-wrap{
+      display:flex;
+      align-items:center;
+      gap:1rem;
+    }
+
+    .nav-links{
+      list-style:none;
+      display:flex;
+      gap:1rem;
+      margin:0;
+      padding:0;
+      align-items:center;
+    }
+
+    .nav-links a{
+      display:inline-flex;
+      align-items:center;
+      gap:0.35rem;
+      padding:0.5rem 0.6rem;
+      color:var(--text);
+      text-decoration:none;
+      font-weight:500;
+      border-radius:6px;
+      transition: color 180ms ease, background 180ms ease, transform 160ms ease;
+    }
+
+    .nav-links a:focus{ outline: 2px solid rgba(0,234,255,0.25); outline-offset:3px; }
+
+    .nav-links a:hover{
+      color:var(--accent);
+      background: rgba(255,255,255,0.03);
+      transform: translateY(-2px);
+    }
+
+    /* Active link underline */
+    .nav-links a.active{
+      color:var(--accent);
+      position:relative;
+    }
+    .nav-links a.active::after{
+      content:"";
+      position:absolute;
+      left:8%;
+      right:8%;
+      bottom:-10px;
+      height:3px;
+      border-radius:3px;
+      background:linear-gradient(90deg,var(--accent),#6ef0ff);
+    }
+
+    /* ---------- DROPDOWN ---------- */
+    .dropdown{
+      position:relative;
+    }
+    .dropdown-toggle{
+      display:flex;
+      align-items:center;
+      gap:0.4rem;
+      cursor:pointer;
+    }
+
+    .submenu{
+      pointer-events:none;
+      opacity:0;
+      position:absolute;
+      top:calc(var(--nav-height) + 10px);
+      left:0;
+      min-width:200px;
+      background:var(--glass);
+      backdrop-filter: blur(8px);
+      border-radius:10px;
+      padding:0.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      transition: opacity 180ms ease, transform 180ms ease;
+      transform: translateY(-6px);
+      z-index:100;
+    }
+
+    .submenu a{
+      display:block;
+      padding:0.55rem 0.8rem;
+      color:var(--text);
+      text-decoration:none;
+      border-radius:8px;
+      font-weight:500;
+    }
+    .submenu a:hover{ color:var(--accent); background: rgba(255,255,255,0.03); transform:none; }
+
+    /* show submenu on hover for desktop */
+    @media (hover:hover) and (min-width: 900px){
+      .dropdown:hover .submenu{
+        opacity:1;
+        pointer-events:auto;
+        transform: translateY(0);
+      }
+    }
+
+    /* ---------- HAMBURGER (mobile) ---------- */
+    .hamburger{
+      display:inline-grid;
+      place-items:center;
+      width:44px;
+      height:44px;
+      border-radius:8px;
+      background:transparent;
+      border:0;
+      cursor:pointer;
+      color:var(--text);
+      transition: background 160ms ease;
+    }
+    .hamburger:focus{ outline:2px solid rgba(0,234,255,0.18); outline-offset:3px; }
+    .hamburger .bar{
+      width:20px;
+      height:2px;
+      background:var(--text);
+      transition: transform 220ms ease, opacity 160ms ease;
+      position:relative;
+    }
+    .hamburger .bar::before, .hamburger .bar::after{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      height:2px;
+      background:var(--text);
+      transition: transform 220ms ease, opacity 160ms ease;
+    }
+    .hamburger .bar::before{ top:-6px; }
+    .hamburger .bar::after{ top:6px; }
+
+    .hamburger.open .bar{ transform: rotate(45deg); }
+    .hamburger.open .bar::before{ transform: rotate(90deg) translateX(0); top:0; }
+    .hamburger.open .bar::after{ opacity:0; transform: translateX(6px); }
+
+    /* ---------- MOBILE NAV PANEL ---------- */
+    .mobile-panel{
+      position:fixed;
+      top:var(--nav-height);
+      left:0;
+      right:0;
+      background: linear-gradient(180deg, rgba(34,34,34,0.98), rgba(34,34,34,0.98));
+      max-height:0;
+      overflow:hidden;
+      transition: max-height 280ms ease, opacity 200ms ease;
+      opacity:0;
+      z-index:900;
+    }
+
+    .mobile-panel.open{
+      max-height:420px; /* enough for links */
+      opacity:1;
+    }
+
+    .mobile-links{
+      display:flex;
+      flex-direction:column;
+      gap:0.25rem;
+      padding:0.75rem;
+      margin:0;
+    }
+    .mobile-links a{
+      color:var(--text);
+      text-decoration:none;
+      padding:0.75rem 0.85rem;
+      border-radius:8px;
+      font-weight:600;
+    }
+    .mobile-links a:hover{ background: rgba(255,255,255,0.03); color:var(--accent); }
+
+    .mobile-subtoggle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      width:100%;
+      background:transparent;
+      border:0;
+      padding:0.75rem 0.85rem;
+      color:var(--text);
+      font-weight:600;
+      cursor:pointer;
+      border-radius:8px;
+    }
+    .mobile-subpanel{
+      max-height:0;
+      overflow:hidden;
+      transition: max-height 220ms ease;
+      padding-left:0.5rem;
+    }
+    .mobile-subpanel.open{ max-height:240px; }
+
+    /* ---------- PAGE CONTENT / SECTIONS ---------- */
+    main{ padding-top: calc(var(--nav-height) + 12px); }
+
+    section{
+      padding:80px 20px;
+      max-width:1100px;
+      margin:0 auto 60px auto;
+      background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.9));
+      border-radius:14px;
+      box-shadow: 0 6px 22px rgba(11,11,11,0.06);
+    }
+    h1,h2{ margin:0 0 12px 0; }
+    p{ margin:0 0 14px 0; color:#333; }
+
+    /* small screens */
+    @media (max-width:899px){
+      .nav-links{ display:none; }
+      .hamburger{ display:inline-grid; }
+      .logo{ color:var(--text); }
+      nav{ padding:0 0.75rem; }
+    }
+
+    /* large screens */
+    @media (min-width:900px){
+      .hamburger{ display:none; }
+      .mobile-panel{ display:none; }
+      nav{ padding:0 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav id="navbar" role="navigation" aria-label="Main Navigation">
+    <div class="logo" id="brand">MyWebsite</div>
+
+    <div class="nav-wrap">
+      <!-- Desktop links -->
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#home" data-target="home">Home</a></li>
+        <li><a href="#about" data-target="about">About</a></li>
+
+        <li class="dropdown" aria-haspopup="true" aria-expanded="false">
+          <div class="dropdown-toggle" tabindex="0" role="button" aria-label="Open Services menu">
+            <a href="#services" data-target="services" style="pointer-events:none;">Services</a>
+            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style="opacity:0.9">
+              <path d="M7 10l5 5 5-5z" fill="currentColor"></path>
+            </svg>
+          </div>
+
+          <div class="submenu" role="menu" aria-label="Services submenu">
+            <a href="#consulting" data-target="consulting" role="menuitem">Consulting</a>
+            <a href="#design" data-target="design" role="menuitem">Design</a>
+            <a href="#development" data-target="development" role="menuitem">Development</a>
+          </div>
+        </li>
+
+        <li><a href="#portfolio" data-target="portfolio">Portfolio</a></li>
+        <li><a href="#contact" data-target="contact">Contact</a></li>
+      </ul>
+
+      <!-- Hamburger -->
+      <button class="hamburger" id="hambtn" aria-expanded="false" aria-controls="mobilePanel" aria-label="Open menu">
+        <span class="bar" aria-hidden="true"></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile sliding panel -->
+  <div id="mobilePanel" class="mobile-panel" aria-hidden="true">
+    <nav class="mobile-nav" aria-label="Mobile menu">
+      <ul class="mobile-links" id="mobileLinks">
+        <li><a href="#home" data-target="home">Home</a></li>
+        <li><a href="#about" data-target="about">About</a></li>
+
+        <li>
+          <button class="mobile-subtoggle" aria-expanded="false">Services
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg>
+          </button>
+          <div class="mobile-subpanel" aria-hidden="true">
+            <a href="#consulting" data-target="consulting">Consulting</a>
+            <a href="#design" data-target="design">Design</a>
+            <a href="#development" data-target="development">Development</a>
+          </div>
+        </li>
+
+        <li><a href="#portfolio" data-target="portfolio">Portfolio</a></li>
+        <li><a href="#contact" data-target="contact">Contact</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- ========== PAGE CONTENT ========== -->
+  <main>
+    <section id="home">
+      <h1>Home</h1>
+      <p>Welcome! Scroll to see the navbar change, try the mobile menu, and open the Services submenu.</p>
+      <p>Small demo content to create scrollable area. Keep scrolling to see active link highlighting.</p>
+    </section>
+
+    <section id="about">
+      <h2>About</h2>
+      <p>About content goes here. This is a separate section for the "About" navigation link.</p>
+    </section>
+
+    <section id="services">
+      <h2>Services (overview)</h2>
+      <p>Overview of services offered. The submenu links jump to the dedicated subsections below.</p>
+    </section>
+
+    <section id="consulting">
+      <h2>Consulting</h2>
+      <p>Consulting service details.</p>
+    </section>
+
+    <section id="design">
+      <h2>Design</h2>
+      <p>Design service details.</p>
+    </section>
+
+    <section id="development">
+      <h2>Development</h2>
+      <p>Development service details.</p>
+    </section>
+
+    <section id="portfolio">
+      <h2>Portfolio</h2>
+      <p>Portfolio samples and details.</p>
+    </section>
+
+    <section id="contact">
+      <h2>Contact</h2>
+      <p>Contact form or contact details placeholder.</p>
+    </section>
+
+    <!-- filler to allow scrolling further -->
+    <section>
+      <h2>More content</h2>
+      <p>Extra filler so the page is scrollable and you can test the active state properly.</p>
+      <p style="height:400px"></p>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const navbar = document.getElementById('navbar');
+      const hambtn = document.getElementById('hambtn');
+      const mobilePanel = document.getElementById('mobilePanel');
+      const mobileSubtoggle = document.querySelector('.mobile-subtoggle');
+      const mobileSubpanel = document.querySelector('.mobile-subpanel');
+      const navLinks = document.querySelectorAll('.nav-links a');
+      const mobileLinks = document.querySelectorAll('.mobile-links a');
+      const allLinks = [...navLinks, ...mobileLinks];
+      const dropdown = document.querySelector('.dropdown');
+      const dropdownToggle = dropdown && dropdown.querySelector('.dropdown-toggle');
+      const submenu = dropdown && dropdown.querySelector('.submenu');
+
+      /* ---------- SCROLL: toggle scrolled class ---------- */
+      function onScroll(){
+        if(window.scrollY > 60) navbar.classList.add('scrolled');
+        else navbar.classList.remove('scrolled');
+      }
+      window.addEventListener('scroll', onScroll, { passive:true });
+      onScroll();
+
+      /* ---------- HAMBURGER TOGGLE ---------- */
+      hambtn.addEventListener('click', () => {
+        const open = hambtn.classList.toggle('open');
+        hambtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        mobilePanel.classList.toggle('open', open);
+        mobilePanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+
+        // prevent page scroll when mobile nav open
+        document.body.style.overflow = open ? 'hidden' : '';
+      });
+
+      // close mobile panel when clicking outside
+      document.addEventListener('click', (e) => {
+        if(!mobilePanel.contains(e.target) && !hambtn.contains(e.target) && mobilePanel.classList.contains('open')){
+          hambtn.classList.remove('open');
+          hambtn.setAttribute('aria-expanded','false');
+          mobilePanel.classList.remove('open');
+          mobilePanel.setAttribute('aria-hidden','true');
+          document.body.style.overflow = '';
+        }
+      });
+
+      /* ---------- MOBILE SUBMENU TOGGLE ---------- */
+      if(mobileSubtoggle && mobileSubpanel){
+        mobileSubtoggle.addEventListener('click', () => {
+          const opened = mobileSubpanel.classList.toggle('open');
+          mobileSubtoggle.setAttribute('aria-expanded', opened ? 'true':'false');
+          mobileSubpanel.setAttribute('aria-hidden', opened ? 'false':'true');
+        });
+      }
+
+      /* ---------- DESKTOP DROPDOWN: click toggle for keyboard users ---------- */
+      if(dropdownToggle && submenu){
+        dropdownToggle.addEventListener('click', (e) => {
+          // only on small screens or when click explicitly
+          if(window.innerWidth < 900){
+            e.preventDefault();
+            const open = submenu.style.opacity === '1';
+            if(open){
+              submenu.style.opacity = '0';
+              submenu.style.pointerEvents = 'none';
+              dropdown.setAttribute('aria-expanded','false');
+            } else {
+              submenu.style.opacity = '1';
+              submenu.style.pointerEvents = 'auto';
+              submenu.style.transform = 'translateY(0)';
+              dropdown.setAttribute('aria-expanded','true');
+            }
+          }
+        });
+
+        // allow keyboard open/close with Enter/Space
+        dropdownToggle.addEventListener('keydown', (ev) => {
+          if(ev.key === 'Enter' || ev.key === ' '){
+            ev.preventDefault();
+            dropdownToggle.click();
+          }
+        });
+      }
+
+      /* ---------- SMOOTH SCROLL + CLOSE MOBILE ON LINK CLICK ---------- */
+      function handleLinkClick(e){
+        const target = e.currentTarget.getAttribute('data-target');
+        if(!target) return;
+        const el = document.getElementById(target);
+        if(el){
+          e.preventDefault();
+          // close mobile nav if open
+          if(mobilePanel.classList.contains('open')){
+            hambtn.classList.remove('open');
+            hambtn.setAttribute('aria-expanded','false');
+            mobilePanel.classList.remove('open');
+            mobilePanel.setAttribute('aria-hidden','true');
+            document.body.style.overflow = '';
+          }
+          // scroll taking navbar height into account
+          const y = el.getBoundingClientRect().top + window.scrollY - (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 70) - 12;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }
+      allLinks.forEach(a => a.addEventListener('click', handleLinkClick));
+
+      /* ---------- ACTIVE LINK ON SCROLL (IntersectionObserver) ---------- */
+      const sections = Array.from(document.querySelectorAll('main section[id]'));
+      const idToLink = {};
+      document.querySelectorAll('[data-target]').forEach(a => { idToLink[a.getAttribute('data-target')] = a; });
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if(entry.isIntersecting){
+            const id = entry.target.id;
+            // Remove active from all desktop links
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+            // set active on the corresponding desktop link (if exists)
+            const link = document.querySelector(`.nav-links a[data-target="${id}"]`);
+            if(link) link.classList.add('active');
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: `-${Math.round((parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 70) / 2)}px 0px -${Math.round((parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 70) / 2)}px 0px`,
+        threshold: 0.35
+      });
+
+      sections.forEach(sec => observer.observe(sec));
+
+      /* ---------- CLOSE SUBMENU WHEN NAV CHANGES ---------- */
+      window.addEventListener('resize', () => {
+        if(window.innerWidth >= 900){
+          // ensure mobile panel closed
+          mobilePanel.classList.remove('open');
+          hambtn.classList.remove('open');
+          document.body.style.overflow = '';
+        }
+        // reset inline submenu styles
+        if(submenu){
+          submenu.style.opacity = '';
+          submenu.style.pointerEvents = '';
+          submenu.style.transform = '';
+        }
+      });
+
+      /* ---------- keyboard: ESC to close mobile panel or submenu ---------- */
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape'){
+          if(mobilePanel.classList.contains('open')){
+            hambtn.classList.remove('open');
+            mobilePanel.classList.remove('open');
+            hambtn.setAttribute('aria-expanded','false');
+            document.body.style.overflow = '';
+          }
+          if(submenu && submenu.style.opacity === '1'){
+            submenu.style.opacity = '0';
+            submenu.style.pointerEvents = 'none';
+            dropdown.setAttribute('aria-expanded','false');
+          }
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>
